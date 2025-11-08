@@ -106,14 +106,14 @@ curl -X POST http://localhost:8082/api/servers/1/restore \
 
 ### Automatic Client Expiration Check
 
-**Автоматически запускается в Docker контейнере** каждый час для отключения просроченных клиентов.
+**Runs automatically in Docker container** every hour to disable expired clients.
 
-Проверить логи крона:
+Check cron logs:
 ```bash
 docker compose exec web tail -f /var/log/cron.log
 ```
 
-Запустить вручную:
+Run manually:
 ```bash
 docker compose exec web php /var/www/html/bin/check_expired_clients.php
 ```
