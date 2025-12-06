@@ -148,8 +148,8 @@ class VpnClient {
         $pdo = DB::conn();
         
         // Get used IPs from database
-        $stmt = $pdo->prepare('SELECT client_ip FROM vpn_clients WHERE server_id = ? AND status = ?');
-        $stmt->execute([$serverData['id'], 'active']);
+        $stmt = $pdo->prepare('SELECT client_ip FROM vpn_clients WHERE server_id = ?');
+        $stmt->execute([$serverData['id']]);
         $usedIPs = $stmt->fetchAll(PDO::FETCH_COLUMN);
         
         // Parse subnet
