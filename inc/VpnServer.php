@@ -27,6 +27,20 @@ class VpnServer {
             throw new Exception('Server not found');
         }
     }
+
+    /**
+     * Resolve VPN subnet CIDR for this server.
+     * Priority:
+     *  1) Value stored for the server in DB ($this->data['vpn_subnet'])
+     *  2) DEFAULT_VPN_SUBNET from environment (.env)
+     *  3) Fallback 10.8.1.0/24
+     */
+    private function getVpnSubnetCidr(): string
+    {
+        $cidr = $this->data['vpn_subnet'] ?? (getenv('DEFAULT_VPN_SUBNET') ?: '10.8.1.0/24');
+        return trim((string)$cidr);
+    }
+
     
     /**
      * Create new VPN server in database
@@ -56,7 +70,7 @@ class VpnServer {
             $data['username'],
             $data['password'],
             $data['container_name'] ?? 'amnezia-awg',
-            $data['vpn_subnet'] ?? '10.8.1.0/24',
+            $data['vpn_subnet'] ?? (getenv('DEFAULT_VPN_SUBNET') ?: '10.8.1.0/24'),
             'deploying'
         ]);
         
@@ -245,6 +259,7 @@ DOCKERFILE;
      * Create start script on remote server
      */
     private function createStartScript(): void {
+        $subnet = $this->getVpnSubnetCidr();
         $script = <<<'BASH'
 #!/bin/bash
 
@@ -285,6 +300,8 @@ iptables -t nat -A POSTROUTING -s 10.8.1.0/24 -o eth1 -j MASQUERADE 2>/dev/null 
 
 tail -f /dev/null
 BASH;
+        $script = str_replace('10.8.1.0/24', $subnet, $script);
+
         
         $escaped = addslashes(trim($script));
         $this->executeCommand("echo \"{$escaped}\" > /opt/amnezia/amnezia-awg/start.sh", true);
@@ -333,6 +350,7 @@ BASH;
      */
     private function initializeServerConfig(int $vpnPort): array {
         $containerName = $this->data['container_name'];
+        $subnet = $this->getVpnSubnetCidr();
         
         // Create directory
         $this->executeCommand("docker exec -i {$containerName} mkdir -p /opt/amnezia/awg", true);
@@ -384,8 +402,8 @@ BASH;
         $this->executeCommand("docker exec -i {$containerName} sh -c 'iptables -A INPUT -i wg0 -j ACCEPT 2>/dev/null || true'", true);
         $this->executeCommand("docker exec -i {$containerName} sh -c 'iptables -A FORWARD -i wg0 -j ACCEPT 2>/dev/null || true'", true);
         $this->executeCommand("docker exec -i {$containerName} sh -c 'iptables -A OUTPUT -o wg0 -j ACCEPT 2>/dev/null || true'", true);
-        $this->executeCommand("docker exec -i {$containerName} sh -c 'iptables -A FORWARD -i wg0 -o eth0 -s 10.8.1.0/24 -j ACCEPT 2>/dev/null || true'", true);
-        $this->executeCommand("docker exec -i {$containerName} sh -c 'iptables -t nat -A POSTROUTING -s 10.8.1.0/24 -o eth0 -j MASQUERADE 2>/dev/null || true'", true);
+        $this->executeCommand("docker exec -i {$containerName} sh -c 'iptables -A FORWARD -i wg0 -o eth0 -s {$subnet} -j ACCEPT 2>/dev/null || true'", true);
+        $this->executeCommand("docker exec -i {$containerName} sh -c 'iptables -t nat -A POSTROUTING -s {$subnet} -o eth0 -j MASQUERADE 2>/dev/null || true'", true);
         
         sleep(2);
         

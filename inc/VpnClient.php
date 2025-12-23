@@ -157,7 +157,9 @@ class VpnClient {
         $networkLong = ip2long($parts[0]);
         
         // Reserve network address
-        $used = ['10.8.1.0' => true];
+        $subnet = $server['vpn_subnet'] ?? (getenv('DEFAULT_VPN_SUBNET') ?: '10.8.1.0/24');
+        $networkIp = explode('/', $subnet)[0];
+        $used = [$networkIp => true];
         foreach ($usedIPs as $ip) {
             $used[$ip] = true;
         }
